@@ -224,6 +224,24 @@ with tab3:
     df_yt["time"] = pd.to_datetime(df_yt["time"], errors="coerce")
     df_yt = df_yt.dropna(subset=["time"]).sort_values("time")
 
+    # Normaliser les colonnes si elles existent sous un autre nom
+    mapping = {}
+    if "channelTitle" in df_yt.columns:
+        mapping["channelTitle"] = "name"
+    if "subscriberCount" in df_yt.columns:
+        mapping["subscriberCount"] = "subscribers"
+    if "viewCount" in df_yt.columns:
+        mapping["viewCount"] = "views"
+    if "videoCount" in df_yt.columns:
+        mapping["videoCount"] = "videos"
+    if mapping:
+        df_yt = df_yt.rename(columns=mapping)
+
+    # Vérifier que les colonnes essentielles existent
+    for col in ["name", "subscribers", "views", "videos"]:
+        if col not in df_yt.columns:
+            df_yt[col] = 0  # ou np.nan si tu préfères
+
     # Trier par nombre d'abonnés décroissant
     latest_subs = df_yt.groupby("name")["subscribers"].last()
     channels_sorted = latest_subs.sort_values(ascending=False).index.tolist()
