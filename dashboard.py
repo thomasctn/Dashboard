@@ -212,7 +212,7 @@ with tab2:
 # ───────────────────────────────────────────────
 # Onglet YouTube
 with tab3:
-    st.header("📺 Dashboard YouTube — Chaînes populaires")
+    st.header("📺 Dashboard YouTube — Vidéos populaires")
 
     YT_FILE = "youtube_data.csv"
 
@@ -224,32 +224,22 @@ with tab3:
     df_yt["time"] = pd.to_datetime(df_yt["time"], errors="coerce")
     df_yt = df_yt.dropna(subset=["time"]).sort_values("time")
 
-    # Normaliser les colonnes si elles existent sous un autre nom
-    mapping = {}
-    if "channelTitle" in df_yt.columns:
-        mapping["channelTitle"] = "name"
-    if "subscriberCount" in df_yt.columns:
-        mapping["subscriberCount"] = "subscribers"
-    if "viewCount" in df_yt.columns:
-        mapping["viewCount"] = "views"
-    if "videoCount" in df_yt.columns:
-        mapping["videoCount"] = "videos"
-    if mapping:
-        df_yt = df_yt.rename(columns=mapping)
+    # Nettoyage des colonnes numériques
+    for col in ["views", "likes", "comments"]:
+        if col in df_yt.columns:
+            df_yt[col] = pd.to_numeric(df_yt[col], errors="coerce").fillna(0).astype(int)
 
-    # Vérifier que les colonnes essentielles existent
-    for col in ["name", "subscribers", "views", "videos"]:
-        if col not in df_yt.columns:
-            df_yt[col] = 0  # ou np.nan si tu préfères
+    # Création d'une colonne pour identifier la vidéo facilement
+    df_yt["video_label"] = df_yt["title"] + " — " + df_yt["channel_title"]
 
-    # Trier par nombre d'abonnés décroissant
-    latest_subs = df_yt.groupby("name")["subscribers"].last()
-    channels_sorted = latest_subs.sort_values(ascending=False).index.tolist()
+    # Trier par nombre de vues maximum
+    latest_views = df_yt.groupby("video_label")["views"].max()
+    videos_sorted = latest_views.sort_values(ascending=False).index.tolist()
 
-    selected_channels = st.multiselect(
-        "Choisir les chaînes",
-        channels_sorted,
-        default=channels_sorted[:5]  # préselection des 5 plus populaires
+    selected_videos = st.multiselect(
+        "Choisir les vidéos",
+        videos_sorted,
+        default=videos_sorted[:5]  # préselection des 5 plus vues
     )
 
     # Filtre période
@@ -267,58 +257,58 @@ with tab3:
 
     filtered_yt = df_yt[(df_yt["time"] >= start_time) &
                         (df_yt["time"] <= end_time) &
-                        (df_yt["name"].isin(selected_channels))]
+                        (df_yt["video_label"].isin(selected_videos))]
 
     # Metrics
-    st.subheader("📈 Indicateurs par chaîne")
-    cols = st.columns(len(selected_channels) if selected_channels else 1)
-    for i, channel in enumerate(selected_channels):
-        sub = filtered_yt[filtered_yt["name"] == channel].sort_values("time")
+    st.subheader("📈 Indicateurs par vidéo")
+    cols = st.columns(len(selected_videos) if selected_videos else 1)
+    for i, vid in enumerate(selected_videos):
+        sub = filtered_yt[filtered_yt["video_label"] == vid].sort_values("time")
         if sub.empty:
-            cols[i].write(channel)
-            cols[i].metric("Abonnés", "—", delta="—")
+            cols[i].write(vid)
             cols[i].metric("Vues", "—", delta="—")
-            cols[i].metric("Vidéos", "—", delta="—")
+            cols[i].metric("Likes", "—", delta="—")
+            cols[i].metric("Commentaires", "—", delta="—")
             continue
 
         current = sub.iloc[-1]
         first = sub.iloc[0]
 
-        # Abonnés
-        delta_sub = ((current["subscribers"] - first["subscribers"]) / first["subscribers"] * 100) if first["subscribers"] != 0 else 0
-        cols[i].metric(label=f"{channel} — Abonnés", value=f"{current['subscribers']:,}", delta=f"{delta_sub:.2f}%")
-
         # Vues
         delta_views = ((current["views"] - first["views"]) / first["views"] * 100) if first["views"] != 0 else 0
         cols[i].metric(label="Vues", value=f"{current['views']:,}", delta=f"{delta_views:.2f}%")
 
-        # Vidéos
-        delta_videos = ((current["videos"] - first["videos"]) / first["videos"] * 100) if first["videos"] != 0 else 0
-        cols[i].metric(label="Vidéos", value=f"{current['videos']:,}", delta=f"{delta_videos:.2f}%")
+        # Likes
+        delta_likes = ((current["likes"] - first["likes"]) / first["likes"] * 100) if first["likes"] != 0 else 0
+        cols[i].metric(label="Likes", value=f"{current['likes']:,}", delta=f"{delta_likes:.2f}%")
+
+        # Commentaires
+        delta_comments = ((current["comments"] - first["comments"]) / first["comments"] * 100) if first["comments"] != 0 else 0
+        cols[i].metric(label="Commentaires", value=f"{current['comments']:,}", delta=f"{delta_comments:.2f}%")
 
     # Graphiques interactifs
-    st.subheader("Graphiques des abonnés")
+    st.subheader("Graphiques des vues")
     if filtered_yt.empty:
         st.info("Pas de données pour cette sélection/période.")
     else:
         fig = px.line(
             filtered_yt,
             x="time",
-            y="subscribers",
-            color="name",
-            labels={"time": "Temps", "subscribers": "Abonnés", "name": "Chaîne"},
-            title="Évolution du nombre d'abonnés"
+            y="views",
+            color="video_label",
+            labels={"time": "Temps", "views": "Vues", "video_label": "Vidéo"},
+            title="Évolution des vues"
         )
-        fig.update_layout(legend_title_text="Chaîne")
+        fig.update_layout(legend_title_text="Vidéo")
         st.plotly_chart(fig, use_container_width=True)
 
     # Sparklines miniatures
     st.subheader("Mini-sparklines")
-    for channel in selected_channels:
-        sub = filtered_yt[filtered_yt["name"] == channel].sort_values("time")
+    for vid in selected_videos:
+        sub = filtered_yt[filtered_yt["video_label"] == vid].sort_values("time")
         if not sub.empty:
-            spark = px.line(sub, x="time", y="subscribers", height=100)
-            st.write(channel)
+            spark = px.line(sub, x="time", y="views", height=100)
+            st.write(vid)
             st.plotly_chart(spark, use_container_width=True)
 
     # Tableau des données
