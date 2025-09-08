@@ -14,7 +14,7 @@ tab1, tab2 = st.tabs(["💰 Crypto", "🎮 Steam"])
 # ───────────────────────────────────────────────
 # Onglet Crypto
 with tab1:
-    st.header("💰 Dashboard Crypto — Portfolio")
+    st.header("💰 Dashboard Crypto")
 
     CSV_FILE = "crypto_data.csv"
 
@@ -26,18 +26,17 @@ with tab1:
     df["time"] = pd.to_datetime(df["time"])
     df = df.sort_values("time")
 
-    # Sidebar
+# ─── Sidebar spécifique à Crypto ───
     st.sidebar.header("Filtres Crypto")
     cryptos = sorted(df["name"].unique())
     selected = st.sidebar.multiselect("Cryptos à afficher", cryptos, default=cryptos[:3])
 
-    # Période
     min_time = df["time"].min().to_pydatetime()
     max_time = df["time"].max().to_pydatetime()
     default_start = max_time - timedelta(days=7)
 
     start_time, end_time = st.sidebar.slider(
-        "Choisir la période",
+        "Choisir la période Crypto",
         min_value=min_time,
         max_value=max_time,
         value=(default_start, max_time),
@@ -126,12 +125,11 @@ with tab2:
     df_steam["time"] = pd.to_datetime(df_steam["time"], errors="coerce")
     df_steam = df_steam.dropna(subset=["time"]).sort_values("time")
 
-    # Sidebar
+    # ─── Sidebar spécifique à Steam ───
     st.sidebar.header("Filtres Steam")
-    apps = sorted(df_steam["name"].unique())  # Utiliser le nom du jeu
+    apps = sorted(df_steam["name"].unique())
     selected_apps = st.sidebar.multiselect("Choisir les jeux", apps, default=apps[:5])
 
-    # Période
     min_time = df_steam["time"].min().to_pydatetime()
     max_time = df_steam["time"].max().to_pydatetime()
     default_start = max_time - timedelta(days=7)
