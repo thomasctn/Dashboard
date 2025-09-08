@@ -26,9 +26,15 @@ with tab1:
     df["time"] = pd.to_datetime(df["time"])
     df = df.sort_values("time")
 
-    # Filtre des cryptos directement dans l'onglet
-    cryptos = sorted(df["name"].unique())
-    selected = st.multiselect("Cryptos à afficher", cryptos, default=cryptos[:3])
+    # Trie les cryptos par prix décroissant
+    latest_prices = df.groupby("name")["price"].last()  # dernier prix connu
+    cryptos_sorted = latest_prices.sort_values(ascending=False).index.tolist()
+
+    selected = st.multiselect(
+        "Cryptos à afficher",
+        cryptos_sorted,          # liste triée par prix décroissant
+        default=cryptos_sorted[:3]  # préselection des 3 plus chères
+    )
 
     # Filtre période
     min_time = df["time"].min().to_pydatetime()
@@ -126,10 +132,16 @@ with tab2:
     # Convertir les dates et supprimer les lignes invalides
     df_steam["time"] = pd.to_datetime(df_steam["time"], errors="coerce")
     df_steam = df_steam.dropna(subset=["time"]).sort_values("time")
+    
+    # Trie les jeux par nombre maximum de joueurs
+    latest_players = df_steam.groupby("name")["players"].max()
+    apps_sorted = latest_players.sort_values(ascending=False).index.tolist()
 
-    # ─── champ spécifique à Steam ───
-    apps = sorted(df_steam["name"].unique())
-    selected_apps = st.multiselect("Choisir les jeux", apps, default=apps[:5])
+    selected_apps = st.multiselect(
+        "Choisir les jeux",
+        apps_sorted,           # liste triée par joueurs max décroissant
+        default=apps_sorted[:5]  # préselection des 5 plus joués
+    )
 
     min_time = df_steam["time"].min().to_pydatetime()
     max_time = df_steam["time"].max().to_pydatetime()
