@@ -26,22 +26,24 @@ with tab1:
     df["time"] = pd.to_datetime(df["time"])
     df = df.sort_values("time")
 
-# ─── Sidebar spécifique à Crypto ───
-    st.sidebar.header("Filtres Crypto")
+    # Filtre des cryptos directement dans l'onglet
     cryptos = sorted(df["name"].unique())
-    selected = st.sidebar.multiselect("Cryptos à afficher", cryptos, default=cryptos[:3])
+    selected = st.multiselect("Cryptos à afficher", cryptos, default=cryptos[:3])
 
+    # Filtre période
     min_time = df["time"].min().to_pydatetime()
     max_time = df["time"].max().to_pydatetime()
     default_start = max_time - timedelta(days=7)
 
-    start_time, end_time = st.sidebar.slider(
-        "Choisir la période Crypto",
+    start_time, end_time = st.slider(
+        "Choisir la période",
         min_value=min_time,
         max_value=max_time,
         value=(default_start, max_time),
         format="YYYY-MM-DD HH:mm"
     )
+
+    filtered = df[(df["time"] >= start_time) & (df["time"] <= end_time) & (df["name"].isin(selected))]
 
     # Choix des métriques
     metrics_options = ["Prix", "Variation 24h", "Variation 7j", "Market Cap"]
@@ -125,22 +127,25 @@ with tab2:
     df_steam["time"] = pd.to_datetime(df_steam["time"], errors="coerce")
     df_steam = df_steam.dropna(subset=["time"]).sort_values("time")
 
-    # ─── Sidebar spécifique à Steam ───
-    st.sidebar.header("Filtres Steam")
+    # ─── champ spécifique à Steam ───
     apps = sorted(df_steam["name"].unique())
-    selected_apps = st.sidebar.multiselect("Choisir les jeux", apps, default=apps[:5])
+    selected_apps = st.multiselect("Choisir les jeux", apps, default=apps[:5])
 
     min_time = df_steam["time"].min().to_pydatetime()
     max_time = df_steam["time"].max().to_pydatetime()
     default_start = max_time - timedelta(days=7)
 
-    start_time, end_time = st.sidebar.slider(
+    start_time, end_time = st.slider(
         "Choisir la période Steam",
         min_value=min_time,
         max_value=max_time,
         value=(default_start, max_time),
         format="YYYY-MM-DD"
     )
+
+    filtered_steam = df_steam[(df_steam["time"] >= start_time) & 
+                              (df_steam["time"] <= end_time) & 
+                              (df_steam["name"].isin(selected_apps))]
 
     filtered_steam = df_steam[(df_steam["time"] >= start_time) &
                               (df_steam["time"] <= end_time) &
