@@ -19,7 +19,7 @@ df = df.sort_values("time")
 # Sidebar
 st.sidebar.header("Filtres")
 cryptos = sorted(df["name"].unique())
-selected = st.sidebar.multiselect("Cryptos à afficher", cryptos, default=cryptos[:5])
+selected = st.sidebar.multiselect("Cryptos à afficher", cryptos, default=cryptos[:3])
 
 # Période
 from datetime import datetime, timedelta
@@ -39,7 +39,7 @@ start_time, end_time = st.sidebar.slider(
 
 # Choix des métriques
 metrics_options = ["Prix", "Variation 24h", "Variation 7j", "Market Cap"]
-selected_metrics = st.sidebar.multiselect("Métriques à afficher", metrics_options, default=metrics_options)
+selected_metrics = st.sidebar.multiselect("Métriques à afficher", metrics_options, default=metrics_options[0])
 
 filtered = df[(df["time"] >= start_time) & (df["time"] <= end_time) & (df["name"].isin(selected))]
 
