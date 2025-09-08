@@ -56,15 +56,17 @@ def fetch_steam():
     r = requests.get(STEAM_API, timeout=10)
     r.raise_for_status()
     data = r.json()["response"]["ranks"]
+    print(data)  # 👈 voir la structure exacte
 
     now = datetime.datetime.utcnow().isoformat()
     rows = []
     for g in data:
         rows.append({
             "time": now,
-            "appid": g["appid"],
-            "rank": g["rank"],
-            "players": g["concurrent_in_game"]
+            "appid": g.get("appid"),
+            "rank": g.get("rank"),
+            "last_week_rank": g.get("last_week_rank"),
+            "players": g.get("peak_in_game")  # anciennement 'concurrent_in_game'
         })
     return pd.DataFrame(rows)
 
