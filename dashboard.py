@@ -22,14 +22,20 @@ cryptos = sorted(df["name"].unique())
 selected = st.sidebar.multiselect("Cryptos à afficher", cryptos, default=cryptos[:5])
 
 # Période
-min_time, max_time = df["time"].min(), df["time"].max()
+from datetime import datetime, timedelta
+
+min_time = df["time"].min().to_pydatetime()
+max_time = df["time"].max().to_pydatetime()
+default_start = max_time - timedelta(days=7)
+
 start_time, end_time = st.sidebar.slider(
     "Choisir la période",
     min_value=min_time,
     max_value=max_time,
-    value=(max_time - pd.Timedelta(days=7), max_time),
+    value=(default_start, max_time),
     format="YYYY-MM-DD HH:mm"
 )
+
 
 # Choix des métriques
 metrics_options = ["Prix", "Variation 24h", "Variation 7j", "Market Cap"]
