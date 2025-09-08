@@ -211,7 +211,6 @@ with tab2:
 
 # ───────────────────────────────────────────────
 # Onglet YouTube
-tab3 = st.tab("📺 YouTube")  # Ajouter un troisième onglet
 with tab3:
     st.header("📺 Dashboard YouTube — Chaînes populaires")
 
