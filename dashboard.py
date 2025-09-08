@@ -111,7 +111,84 @@ with tab1:
         st.dataframe(filtered)
 
 # ───────────────────────────────────────────────
-# Onglet Steam (vide pour l'instant)
+# Onglet Steam
 with tab2:
     st.header("🎮 Dashboard Steam — Jeux vidéo")
-    st.info("🚧 Bientôt : stats Steam (top jeux, joueurs actifs, tendances)...")
+
+    STEAM_FILE = "steam_data.csv"
+
+    if not os.path.exists(STEAM_FILE):
+        st.info("Pas de données. Lance collect_data.py au moins une fois pour créer steam_data.csv")
+        st.stop()
+
+    df_steam = pd.read_csv(STEAM_FILE)
+    df_steam["time"] = pd.to_datetime(df_steam["time"])
+    df_steam = df_steam.sort_values("time")
+
+    # Sidebar
+    st.sidebar.header("Filtres Steam")
+    apps = sorted(df_steam["appid"].unique())
+    selected_apps = st.sidebar.multiselect("Choisir les jeux", apps, default=apps[:5])
+
+    # Période
+    min_time = df_steam["time"].min().to_pydatetime()
+    max_time = df_steam["time"].max().to_pydatetime()
+    default_start = max_time - timedelta(days=7)
+
+    start_time, end_time = st.sidebar.slider(
+        "Choisir la période Steam",
+        min_value=min_time,
+        max_value=max_time,
+        value=(default_start, max_time),
+        format="YYYY-MM-DD"
+    )
+
+    filtered_steam = df_steam[(df_steam["time"] >= start_time) & 
+                              (df_steam["time"] <= end_time) & 
+                              (df_steam["appid"].isin(selected_apps))]
+
+    # Metrics
+    st.subheader("📈 Indicateurs par jeu")
+    cols = st.columns(len(selected_apps) if selected_apps else 1)
+    for i, app in enumerate(selected_apps):
+        sub = filtered_steam[filtered_steam["appid"] == app].sort_values("time")
+        if sub.empty:
+            cols[i].write(f"AppID {app}")
+            cols[i].metric("Joueurs max", "—", delta="—")
+            continue
+
+        current = sub.iloc[-1]
+        first = sub.iloc[0]
+
+        # Joueurs max
+        delta = ((current["players"] - first["players"]) / first["players"] * 100) if first["players"] != 0 else 0
+        cols[i].metric(label=f"AppID {app} Joueurs max", value=f"{current['players']:,}", delta=f"{delta:.2f}%")
+
+    # Graphiques interactifs
+    st.subheader("Graphiques des joueurs")
+    if filtered_steam.empty:
+        st.info("Pas de données pour cette sélection/période.")
+    else:
+        fig = px.line(
+            filtered_steam,
+            x="time",
+            y="players",
+            color="appid",
+            labels={"time": "Temps", "players": "Joueurs simultanés", "appid": "AppID"},
+            title="Évolution des joueurs"
+        )
+        fig.update_layout(legend_title_text="AppID")
+        st.plotly_chart(fig, use_container_width=True)
+
+    # Sparklines miniatures
+    st.subheader("Mini-sparklines")
+    for app in selected_apps:
+        sub = filtered_steam[filtered_steam["appid"] == app].sort_values("time")
+        if not sub.empty:
+            spark = px.line(sub, x="time", y="players", height=100)
+            st.write(f"AppID {app}")
+            st.plotly_chart(spark, use_container_width=True)
+
+    # Tableau des données
+    with st.expander("Voir les données brutes"):
+        st.dataframe(filtered_steam)
