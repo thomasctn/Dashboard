@@ -1,7 +1,5 @@
-# dashboard.py
 import streamlit as st
 import pandas as pd
-import datetime
 import plotly.express as px
 import os
 
@@ -18,24 +16,26 @@ df = pd.read_csv(CSV_FILE)
 df["time"] = pd.to_datetime(df["time"])
 df = df.sort_values("time")
 
-# Sidebar controls
+# Sidebar
 st.sidebar.header("Filtres")
-cryptos = sorted(df["name"].unique().tolist())
-selected = st.sidebar.multiselect("Cryptos à afficher", cryptos, default=cryptos[:2])
+cryptos = sorted(df["name"].unique())
+selected = st.sidebar.multiselect("Cryptos à afficher", cryptos, default=cryptos[:5])
 
-period = st.sidebar.radio("Période", ["24h", "7j", "30j", "Tout"], index=1)
+# Période
+min_time, max_time = df["time"].min(), df["time"].max()
+start_time, end_time = st.sidebar.slider(
+    "Choisir la période",
+    min_value=min_time,
+    max_value=max_time,
+    value=(max_time - pd.Timedelta(days=7), max_time),
+    format="YYYY-MM-DD HH:mm"
+)
 
-now = pd.Timestamp.utcnow().tz_localize(None)
-if period == "24h":
-    start_time = now - pd.Timedelta(days=1)
-elif period == "7j":
-    start_time = now - pd.Timedelta(days=7)
-elif period == "30j":
-    start_time = now - pd.Timedelta(days=30)
-else:
-    start_time = df["time"].min()
+# Choix des métriques
+metrics_options = ["Prix", "Variation 24h", "Variation 7j", "Market Cap"]
+selected_metrics = st.sidebar.multiselect("Métriques à afficher", metrics_options, default=metrics_options)
 
-filtered = df[(df["time"] >= start_time) & (df["name"].isin(selected))]
+filtered = df[(df["time"] >= start_time) & (df["time"] <= end_time) & (df["name"].isin(selected))]
 
 # Metrics
 st.subheader("📈 Indicateurs")
@@ -44,25 +44,55 @@ for i, coin in enumerate(selected):
     sub = filtered[filtered["name"] == coin].sort_values("time")
     if sub.empty:
         cols[i].write(coin.upper())
-        cols[i].metric("Prix actuel", "—", delta="—")
+        for metric in selected_metrics:
+            cols[i].metric(metric, "—", delta="—")
         continue
-    current = sub.iloc[-1]["price"]
-    first = sub.iloc[0]["price"]
-    pct = ((current - first) / first * 100) if first != 0 else 0
-    delta_str = f"{pct:.2f}%"
-    cols[i].metric(label=coin.upper(), value=f"{current:.2f} €", delta=delta_str)
 
-# Graph
-st.subheader("Graphique des prix")
+    current = sub.iloc[-1]
+    first = sub.iloc[0]
+
+    # Prix
+    if "Prix" in selected_metrics:
+        delta = ((current["price"] - first["price"]) / first["price"] * 100) if first["price"] != 0 else 0
+        cols[i].metric(label=coin.upper()+" Prix", value=f"{current['price']:.2f} €", delta=f"{delta:.2f}%")
+
+    # Variation 24h
+    if "Variation 24h" in selected_metrics and "change_24h" in sub.columns:
+        cols[i].metric(label="Variation 24h", value=f"{current['change_24h']:.2f} %")
+
+    # Variation 7j
+    if "Variation 7j" in selected_metrics and "change_7d" in sub.columns:
+        cols[i].metric(label="Variation 7j", value=f"{current['change_7d']:.2f} %")
+
+    # Market Cap
+    if "Market Cap" in selected_metrics and "market_cap" in sub.columns:
+        cols[i].metric(label="Market Cap", value=f"{current['market_cap']:,} €")
+
+# Graphiques interactifs
+st.subheader("Graphiques des prix")
 if filtered.empty:
     st.info("Pas de données pour cette sélection/période.")
 else:
-    fig = px.line(filtered, x="time", y="price", color="name",
-                  labels={"time":"Temps","price":"Prix (€)"},
-                  title="Évolution des prix")
+    fig = px.line(
+        filtered,
+        x="time",
+        y="price",
+        color="name",
+        labels={"time":"Temps","price":"Prix (€)"},
+        title="Évolution des prix"
+    )
     fig.update_layout(legend_title_text="Crypto")
     st.plotly_chart(fig, use_container_width=True)
 
-# Table raw data
+# Sparklines miniatures
+st.subheader("Mini-sparklines")
+for coin in selected:
+    sub = filtered[filtered["name"] == coin].sort_values("time")
+    if not sub.empty:
+        spark = px.line(sub, x="time", y="price", height=100)
+        st.write(coin.upper())
+        st.plotly_chart(spark, use_container_width=True)
+
+# Tableau des données
 with st.expander("Voir les données brutes"):
-    st.write(filtered.tail(50))
+    st.dataframe(filtered)
