@@ -121,6 +121,60 @@ def save_steam(df_new):
     print(f"✅ Steam sauvegardé dans {STEAM_FILE}")
 
 # ==============================
+# 🔹 Partie YouTube
+#===============================
+YOUTUBE_FILE = "youtube_data.csv"
+YOUTUBE_API_KEY = "AIzaSyCt11sanT4dKeABArkc8ICjvsjsr5BQjm8"  # Remplace par ta clé
+MAX_RESULTS = 50  # nombre de vidéos à récupérer
+
+def fetch_youtube():
+    url = "https://www.googleapis.com/youtube/v3/videos"
+    params = {
+        "part": "snippet,statistics",
+        "chart": "mostPopular",
+        "regionCode": "US",  # tu peux changer le pays
+        "maxResults": MAX_RESULTS,
+        "key": YOUTUBE_API_KEY
+    }
+    r = requests.get(url, params=params, timeout=10)
+    r.raise_for_status()
+    data = r.json()
+
+    now = datetime.datetime.utcnow().isoformat()
+    rows = []
+    for video in data.get("items", []):
+        snippet = video["snippet"]
+        stats = video.get("statistics", {})
+        rows.append({
+            "time": now,
+            "video_id": video["id"],
+            "title": snippet.get("title"),
+            "channel_title": snippet.get("channelTitle"),
+            "views": int(stats.get("viewCount", 0)),
+            "likes": int(stats.get("likeCount", 0)) if "likeCount" in stats else None,
+            "comments": int(stats.get("commentCount", 0)) if "commentCount" in stats else None
+        })
+    return pd.DataFrame(rows)
+
+def save_youtube(df_new):
+    if os.path.exists(YOUTUBE_FILE):
+        try:
+            df_old = pd.read_csv(YOUTUBE_FILE)
+            if df_old.empty:
+                df = df_new
+            else:
+                df = pd.concat([df_old, df_new], ignore_index=True)
+        except pd.errors.EmptyDataError:
+            df = df_new
+    else:
+        df = df_new
+
+    df.to_csv(YOUTUBE_FILE, index=False)
+    print(f"✅ YouTube sauvegardé dans {YOUTUBE_FILE}")
+
+
+
+# ==============================
 # 🔹 Main
 # ==============================
 def main():
@@ -135,6 +189,13 @@ def main():
         save_steam(df_steam)
     except Exception as e:
         print(f"❌ Erreur Steam: {e}")
+
+    try:
+        df_youtube = fetch_youtube()
+        save_youtube(df_youtube)
+    except Exception as e:
+        print(f"❌ Erreur YouTube: {e}")
+
 
 if __name__ == "__main__":
     main()

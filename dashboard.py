@@ -9,7 +9,7 @@ st.title("📊 Dashboard Global")
 
 # ───────────────────────────────────────────────
 # Onglets
-tab1, tab2 = st.tabs(["💰 Crypto", "🎮 Steam"])
+tab1, tab2, tab3 = st.tabs(["💰 Crypto", "🎮 Steam","Youtube"])
 
 # ───────────────────────────────────────────────
 # Onglet Crypto
@@ -132,7 +132,7 @@ with tab2:
     # Convertir les dates et supprimer les lignes invalides
     df_steam["time"] = pd.to_datetime(df_steam["time"], errors="coerce")
     df_steam = df_steam.dropna(subset=["time"]).sort_values("time")
-    
+
     # Trie les jeux par nombre maximum de joueurs
     latest_players = df_steam.groupby("name")["players"].max()
     apps_sorted = latest_players.sort_values(ascending=False).index.tolist()
@@ -208,3 +208,102 @@ with tab2:
     # Tableau des données
     with st.expander("Voir les données brutes"):
         st.dataframe(filtered_steam)
+
+# ───────────────────────────────────────────────
+# Onglet YouTube
+tab3 = st.tab("📺 YouTube")  # Ajouter un troisième onglet
+with tab3:
+    st.header("📺 Dashboard YouTube — Chaînes populaires")
+
+    YT_FILE = "youtube_data.csv"
+
+    if not os.path.exists(YT_FILE):
+        st.info("Pas de données. Lance collect_data_youtube.py au moins une fois pour créer youtube_data.csv")
+        st.stop()
+
+    df_yt = pd.read_csv(YT_FILE)
+    df_yt["time"] = pd.to_datetime(df_yt["time"], errors="coerce")
+    df_yt = df_yt.dropna(subset=["time"]).sort_values("time")
+
+    # Trier par nombre d'abonnés décroissant
+    latest_subs = df_yt.groupby("name")["subscribers"].last()
+    channels_sorted = latest_subs.sort_values(ascending=False).index.tolist()
+
+    selected_channels = st.multiselect(
+        "Choisir les chaînes",
+        channels_sorted,
+        default=channels_sorted[:5]  # préselection des 5 plus populaires
+    )
+
+    # Filtre période
+    min_time = df_yt["time"].min().to_pydatetime()
+    max_time = df_yt["time"].max().to_pydatetime()
+    default_start = max_time - timedelta(days=7)
+
+    start_time, end_time = st.slider(
+        "Choisir la période YouTube",
+        min_value=min_time,
+        max_value=max_time,
+        value=(default_start, max_time),
+        format="YYYY-MM-DD"
+    )
+
+    filtered_yt = df_yt[(df_yt["time"] >= start_time) &
+                        (df_yt["time"] <= end_time) &
+                        (df_yt["name"].isin(selected_channels))]
+
+    # Metrics
+    st.subheader("📈 Indicateurs par chaîne")
+    cols = st.columns(len(selected_channels) if selected_channels else 1)
+    for i, channel in enumerate(selected_channels):
+        sub = filtered_yt[filtered_yt["name"] == channel].sort_values("time")
+        if sub.empty:
+            cols[i].write(channel)
+            cols[i].metric("Abonnés", "—", delta="—")
+            cols[i].metric("Vues", "—", delta="—")
+            cols[i].metric("Vidéos", "—", delta="—")
+            continue
+
+        current = sub.iloc[-1]
+        first = sub.iloc[0]
+
+        # Abonnés
+        delta_sub = ((current["subscribers"] - first["subscribers"]) / first["subscribers"] * 100) if first["subscribers"] != 0 else 0
+        cols[i].metric(label=f"{channel} — Abonnés", value=f"{current['subscribers']:,}", delta=f"{delta_sub:.2f}%")
+
+        # Vues
+        delta_views = ((current["views"] - first["views"]) / first["views"] * 100) if first["views"] != 0 else 0
+        cols[i].metric(label="Vues", value=f"{current['views']:,}", delta=f"{delta_views:.2f}%")
+
+        # Vidéos
+        delta_videos = ((current["videos"] - first["videos"]) / first["videos"] * 100) if first["videos"] != 0 else 0
+        cols[i].metric(label="Vidéos", value=f"{current['videos']:,}", delta=f"{delta_videos:.2f}%")
+
+    # Graphiques interactifs
+    st.subheader("Graphiques des abonnés")
+    if filtered_yt.empty:
+        st.info("Pas de données pour cette sélection/période.")
+    else:
+        fig = px.line(
+            filtered_yt,
+            x="time",
+            y="subscribers",
+            color="name",
+            labels={"time": "Temps", "subscribers": "Abonnés", "name": "Chaîne"},
+            title="Évolution du nombre d'abonnés"
+        )
+        fig.update_layout(legend_title_text="Chaîne")
+        st.plotly_chart(fig, use_container_width=True)
+
+    # Sparklines miniatures
+    st.subheader("Mini-sparklines")
+    for channel in selected_channels:
+        sub = filtered_yt[filtered_yt["name"] == channel].sort_values("time")
+        if not sub.empty:
+            spark = px.line(sub, x="time", y="subscribers", height=100)
+            st.write(channel)
+            st.plotly_chart(spark, use_container_width=True)
+
+    # Tableau des données
+    with st.expander("Voir les données brutes"):
+        st.dataframe(filtered_yt)
